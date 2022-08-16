@@ -3,7 +3,7 @@ import sqlite3
 import streamlit as st
 global sff
 
-conn=sqlite3.connect("db21.db")
+conn=sqlite3.connect("db22.db")
 conn.execute("PRAGMA foreign_keys = 1")
 cur=conn.cursor()
 
@@ -31,9 +31,9 @@ def create_table():
              co_name NVARCHAR(50) NOT NULL,
              mname NVARCHAR(50) NOT NULL,
              mat_name NVARCHAR(50) NOT NULL,
-             cost NVARCHAR(50) NOT NULL,
-             m_quantity NVARCHAR(50) NOT NULL,
-             m_gst NVARCHAR(50) NOT NULL,
+             cost REAL NOT NULL,
+             m_quantity REAL NOT NULL,
+             m_gst REAL NOT NULL,
              m_total REAL NOT NULL) ''')
     
     conn.commit()
@@ -109,6 +109,10 @@ def show_vendor():
     
     m=cur.execute('''SELECT *FROM vendor_info''')
     st.table(m.fetchall())
+def show_material():
+    
+    m=cur.execute('''SELECT *FROM materialinfo''')
+    st.table(m.fetchall())
 def search_by_cname(cnm):
     try:
         cur.execute('SELECT * FROM company_info WHERE c_name="{}"'.format(cnm))
@@ -128,26 +132,89 @@ def search_by_mcname(mcn):
         return 0
    
 def total(cost1,quantity1,gst1):
-    gst_cost= ((float(cost1)*float(gst1)/100))*float(quantity1)
+    base_cost=float(cost1)*float(quantity1)
+    gst_cost= float(base_cost)*(float(gst1)/100)
     
-    total1=float(cost1) + float(gst_cost)
+    total1=float(base_cost) + float(gst_cost)
     return float(total1)
 
 def Bills():
      try:
         cur.execute('SELECT * FROM materialinfo')
         data = cur.fetchall()
-        return data
+        cur.execute('SELECT SUM(m_total) FROM materialinfo')
+        data1 = cur.fetchall()
+        return data,data1
+     except sqlite3.IntegrityError:
+        st.write(" User Not Found")
+        return 0
+    
+def vendor_wise_bill(vname):
+    
+      try:
+        cur.execute('SELECT * FROM materialinfo WHERE v_name="{}"'.format(vname))
+        data = cur.fetchall()
+        
+        cur.execute('SELECT SUM(m_total) FROM materialinfo WHERE v_name="{}"'.format(vname))
+        data1 = cur.fetchall()
+        return data,data1
+      except sqlite3.IntegrityError:
+        st.write(" User Not Found")
+        return 0
+    
+    
+def column_wise_bill(cname):
+    
+      try:
+        cur.execute('SELECT * FROM materialinfo WHERE co_name="{}"'.format(cname))
+        data = cur.fetchall()
+        
+        cur.execute('SELECT SUM(m_total) FROM materialinfo WHERE co_name="{}"'.format(cname))
+        data1 = cur.fetchall()
+        return data,data1
+      except sqlite3.IntegrityError:
+        st.write(" User Not Found")
+        return 0
+def by_vendor_wise():
+     try:
+        m2=cur.execute('SELECT v_name FROM  vendor_info')
+        pairs = [x[0] for x in m2.fetchall()]
+        return pairs
+        
      except sqlite3.IntegrityError:
         st.write(" User Not Found")
         return 0
 
+def by_company_wise():
+     try:
+        m2=cur.execute('SELECT c_name FROM  company_info')
+        pairs = [x[0] for x in m2.fetchall()]
+        return pairs
+        
+     except sqlite3.IntegrityError:
+        st.write(" User Not Found")
+        return 0
+    
+def drop_tables():
+    try:
+        cur.execute('''DROP TABLE machineinfotable''')
+        conn.commit()
+        cur.execute('''DROP TABLE companyinfo''')
+        conn.commit()
+        cur.execute('''DROP TABLE vendor_info''')
+        conn.commit()
+        cur.execute('''DROP TABLE materialinfo''')
+        conn.commit()
+        
+    except sqlite3.IntegrityError:
+        st.write(" User Not Found")
+        return 0
 # -----------------------------------------------------------------------------------------------
 st.title("Management ")
 
 create_table()
 
-menu = ["Home", "Add Company", "Add Machine","Add Vendor","Add Material","Show Details","Search","Bills"]
+menu = ["Home", "Add Company", "Add Machine","Add Vendor","Add Material","Show Details","Search","Bills","Clear"]
 choice = st.sidebar.selectbox("Menu", menu)
 if choice == "Home":
     st.write("WELCOME")
@@ -218,23 +285,12 @@ elif choice == "Add Vendor":
                 st.success("Successfully added")           
                 
 elif choice == "Add Material":
-    with st.form(key='Material Information'):
-        col1,col2,col3 = st.columns([1,1,1])
-        with col1:
-            
-            data2=vendor_entry()
-            vendorn=st.selectbox('Select Vendor', data2)
-        with col2:
-            
-            data3=cname_entry()
-            coname=st.selectbox('Select company', data3)
-            
-        with col3:
-            
-            data4=machine_entry(coname)
-            machine=st.selectbox('Select machine', data4)
-        submit4 = st.form_submit_button(label='Add')
-        
+    data2=vendor_entry()
+    vendorn=st.selectbox('Select Vendor', data2)
+    data3=cname_entry()
+    coname=st.selectbox('Select company', data3)
+    data4=machine_entry(coname)
+    machine=st.selectbox('Select machine', data4)
     with st.form(key='Material Information1'):
         col1,col2,col3,col4 = st.columns([1,1,1,1])
         with col1:
@@ -266,6 +322,7 @@ elif choice== "Show Details":
    show_company()
    show_machine()
    show_vendor()
+   show_material()
 
 
 
@@ -277,14 +334,31 @@ elif choice=="Search":
         st.table(searched_data2)
 
 elif choice=="Bills":
-    bill=Bills()
+    bill,total=Bills()
     st.table(bill)
-    
-    
+    st.write(total[0][0])
+    option=st.radio("SELECT OPTION",["BY VENDOR WISE","BY COMPANY WISE"])
+    if option=="BY VENDOR WISE":
+        list1=by_vendor_wise()
+        op1=st.selectbox("VENDOR", list1)
+        if op1:
+            result,amount1=vendor_wise_bill(op1)
+            st.table(result)
+            st.write("TOTAL AMOUNT ",amount1[0][0])
+    elif option=="BY COMPANY WISE": 
+        list2=by_company_wise()
+        op2=st.selectbox("Company", list2)
+        if op2:
+            result1,amount2=column_wise_bill(op2)
+            st.table(result1)
+            st.write("TOTAL AMOUNT ",amount2[0][0])
 
 
-
-
+elif choice=="Clear":
+    d=st.button("Delete Table")
+    if d:
+        drop_tables()
+        st.write("deleted")
 
 
 
