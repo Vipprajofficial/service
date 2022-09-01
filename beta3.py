@@ -1,7 +1,6 @@
 #import streamlit as st
 import sqlite3
 import streamlit as st
-global sff
 
 conn=sqlite3.connect("database07.db")
 conn.execute("PRAGMA foreign_keys = 1")
@@ -278,7 +277,10 @@ def total(cost1,quantity1,gst1):
     
     total1=float(base_cost) + float(gst_cost)
     return float(total1)
-
+def collection(po):
+        cur.execute('SELECT * FROM collection WHERE cpo_no="{}"'.format(po))
+        data1 = cur.fetchall()
+        return data1
 def Bills():
      try:
         cur.execute('SELECT * FROM materialinfo')
@@ -408,7 +410,7 @@ select2=st.sidebar.selectbox("Choose",select1)
 if select2=="HOME":
     st.write("WELCOME")
 elif select2=="COMPANY":
-    menu = ["Add Company","Add Machine","Purchase Order","Machine Estimation","Add Collection","Show Details","Search","Company Payments"]
+    menu = ["Add Company","Add Machine","Purchase Order","Machine Estimation","Add Collection","Show Details","Search","Company Payments","Transaction History"]
     choice = st.sidebar.selectbox("Menu", menu)
     
 
@@ -545,6 +547,14 @@ elif select2=="COMPANY":
                 profit=res1[0][0]-res2[0][0]
                 st.write("profit")
                 st.write(profit)
+    elif choice=="Transaction History":
+         data = company_info_entry()
+         cname3 = st.selectbox('Select company', data)
+         po1=select_po(cname3)
+         po2=st.selectbox("Select po",po1)
+         collection1=collection(po2)
+         st.table(collection1)
+      
 elif select2=="VENDOR":
     menu = ["Add Vendor","Add Material","Search","Vendor Bills"]
     choice = st.sidebar.selectbox("Menu", menu)
